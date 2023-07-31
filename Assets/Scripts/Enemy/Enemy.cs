@@ -11,7 +11,7 @@ public class Enemy : NetworkBehaviour
     public float jumpHeight = 5.0f;
     public float moveSpeed = 5.0f;
     public bool canJump = true;
-
+    public bool canWallJump = true;
     public enum CharacterType
     {
         Hero,

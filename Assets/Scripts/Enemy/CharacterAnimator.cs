@@ -19,6 +19,8 @@ public class CharacterAnimator : NetworkBehaviour
     Rigidbody2D playerRigid;
     Animator animator;
     float timer = 0;
+    public int scale = 1;
+    public bool isOnWall = false;
     private void Start()
     {
         playerRigid = GetComponent<Rigidbody2D>();
@@ -26,11 +28,12 @@ public class CharacterAnimator : NetworkBehaviour
         timer = Time.time;
     }
 
-    [Client]
+
     // Update is called once per frame
     void Update()
     {
-        if (!isLocalPlayer) return;
+        if (!isLocalPlayer && !isServer) return;
+        
         if (Time.time - timer <= 1f) return;
         
         if(characterType == CharacterType.Hero)
@@ -39,33 +42,77 @@ public class CharacterAnimator : NetworkBehaviour
         }
     }
 
-    [Client]
+
     private void HeroAnim()
     {
         string anim;
-        if(playerRigid.velocity.x >= 0.1f || playerRigid.velocity.x <= -0.1f)
+
+        
+
+        if(playerRigid.velocity.x <= -0.1f)
+        {
+            scale = -1;
+        } else if (playerRigid.velocity.x >= 0.1f)
+        {
+            scale = 1;
+        }
+
+        transform.localScale = Vector2.MoveTowards(transform.localScale,
+            new Vector2(scale, 1), 10 * Time.deltaTime);
+        
+
+        if (playerRigid.velocity.y >= 0.1)
+        {
+            anim = "Hero_Jump";
+        } else if(playerRigid.velocity.y <= -0.1f)
+        {
+            anim = "Hero_Fall";
+        } else if(playerRigid.velocity.x >= 0.1f || playerRigid.velocity.x <= -0.1f)
         {
             anim = ("Hero_Run");
-            animator.Play(anim);
+            
         }
         else
         {
             anim = ("Hero_Idle");
+            
+        }
+
+
+        bool feetOnGround = transform.GetChild(0).GetComponent<BoxCollider2D>().IsTouchingLayers(LayerMask.GetMask("Ground"));
+        bool handsOnGround = transform.GetChild(1).GetComponent<BoxCollider2D>().IsTouchingLayers(LayerMask.GetMask("Ground"));
+
+        if (handsOnGround && !feetOnGround)
+        {
+            anim = "Hero_Wall";
+        }
+        
+
+
+
+
+        if (anim != "" && anim != animator.GetCurrentAnimatorClipInfo(0)[0].clip.name){
+            CmdHeroAdmin(anim, scale);
             animator.Play(anim);
         }
-        try
-        {
-            RpcHeroAdmin(anim);
-
-        }
-        catch (Exception r) { }
         
     }
 
-    [ClientRpc]
-    private void RpcHeroAdmin(string anim)
+
+
+    [Command]
+    private void CmdHeroAdmin(string anim, int scale)
+    {
+        PlayerTheFuckingAnim(anim, scale);
+    }
+
+    [Server]
+    private void PlayerTheFuckingAnim(string anim, int scale)
     {
         animator.Play(anim);
+        if (scale == 0) return;
+        transform.localScale = Vector2.MoveTowards(transform.localScale,
+            new Vector2(scale, 1), 10 * Time.deltaTime);
     }
 
 

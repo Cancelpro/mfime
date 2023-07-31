@@ -11,7 +11,7 @@ public class Player : NetworkBehaviour
     private int controlledEnemyPosition = 0;
     float speed = 5.0f;
     private Rigidbody2D feet;
-
+    private bool canMove = true;
 
 
     [SyncVar]
@@ -55,8 +55,11 @@ public class Player : NetworkBehaviour
 
         if (controlledEnemy != null && controlledEnemy.GetComponent<Rigidbody2D>())
         {
-            Move();
-            Jump();
+            if (canMove)
+            {
+                Move();
+                Jump();
+            }
         }
 
             if (SharedPlayerData.instance.currentPlayerControlledEnemy == playerNumber
@@ -75,7 +78,7 @@ public class Player : NetworkBehaviour
     private void CmdLoadNewScene()
     {
         SharedPlayerData.instance.controllableEnemies.Clear();
-        NetworkManager.singleton.ServerChangeScene("SampleScene");
+        NetworkManager.singleton.ServerChangeScene("Level1");
     }
 
     [Client]
@@ -100,6 +103,16 @@ public class Player : NetworkBehaviour
     [Client]
     private void Jump()
     {
+
+        bool feetOnGround = controlledEnemy.transform.GetChild(0).GetComponent<BoxCollider2D>().IsTouchingLayers(LayerMask.GetMask("Ground"));
+
+
+        if (feetOnGround)
+        {
+            controlledEnemy.GetComponent<Enemy>().canJump = true;
+
+        }
+
         if (Input.GetKeyDown(KeyCode.Z))
         {
             CmdJump();
@@ -124,19 +137,39 @@ public class Player : NetworkBehaviour
     private void CmdJump()
     {
         Enemy enemyData = controlledEnemy.GetComponent<Enemy>();
-
-        if (controlledEnemy.transform.GetChild(0).GetComponent<BoxCollider2D>().IsTouchingLayers(LayerMask.GetMask("Ground")))
+        bool feetOnGround = controlledEnemy.transform.GetChild(0).GetComponent<BoxCollider2D>().IsTouchingLayers(LayerMask.GetMask("Ground"));
+        bool handsOnGround = controlledEnemy.transform.GetChild(1).GetComponent<BoxCollider2D>().IsTouchingLayers(LayerMask.GetMask("Ground"));
+         if(feetOnGround && !handsOnGround)
         {
-            enemyData.canJump = true;
+            enemyData.canWallJump = true;
         }
+
+        if (enemyData.canWallJump && handsOnGround && !feetOnGround)
+        {
+            Rigidbody2D rigid = controlledEnemy.GetComponent<Rigidbody2D>();
+            rigid.velocity = Vector2.zero;
+            canMove = false;
+            Invoke("CanJumpAgain", 0.5f);
+            controlledEnemy.GetComponent<Rigidbody2D>().AddForce(new Vector2(enemyData.jumpHeight * -controlledEnemy.GetComponent<CharacterAnimator>().scale,
+                enemyData.jumpHeight), ForceMode2D.Impulse);
+            Debug.Log("huh");
+        }
+
 
         if (enemyData.canJump)
         {
+            Rigidbody2D rigid = controlledEnemy.GetComponent<Rigidbody2D>();
+            rigid.velocity = new Vector2(rigid.velocity.x, 0);
             controlledEnemy.GetComponent<Rigidbody2D>().AddForce(new Vector2(0, 
                 enemyData.jumpHeight), ForceMode2D.Impulse);
             enemyData.canJump = false;
 
         }
+    }
+
+    private void CanJumpAgain()
+    {
+        canMove = true;
     }
 
 
